@@ -1,0 +1,18 @@
+# Legacy planning folder (outside active MVP code)
+Pair_Programming/
+.local-preservado/
+
+# OS and editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Logs
+*.log
+
+# Node and testing artifacts
+node_modules/
+coverage/
+playwright-report/
+test-results/
+.nyc_output/
