@@ -8,11 +8,64 @@
   </head>
   <body>
     <main class="app">
-      <h1>Vida de Inseto</h1>
-      <p>Estrutura inicial do projeto preparada.</p>
-      <button id="btn-arcade">Arcade</button>
-      <button id="btn-selection">Selection</button>
+      <section id="screen-menu" class="screen screen-active">
+        <h1>Vida de Inseto</h1>
+        <p class="subtitle">Pratique algoritmos acompanhando cada etapa da execucao.</p>
+        <div class="actions">
+          <button id="btn-arcade">Arcade</button>
+          <button id="btn-selection">Selection</button>
+        </div>
+      </section>
+
+      <section id="screen-selection" class="screen">
+        <h2>Selection</h2>
+        <p>Escolha o algoritmo para treino didatico.</p>
+        <div id="selection-list" class="actions"></div>
+        <button id="btn-back-menu">Voltar</button>
+      </section>
+
+      <section id="screen-game" class="screen">
+        <header class="hud">
+          <span>Modo: <strong id="hud-mode">-</strong></span>
+          <span>Pontos: <strong id="hud-score">0</strong></span>
+          <span>Erros: <strong id="hud-errors">0</strong></span>
+          <span>Fase: <strong id="hud-phase">1</strong></span>
+          <span>Algoritmo: <strong id="hud-algorithm">-</strong></span>
+          <span>Seed: <strong id="hud-seed">-</strong></span>
+        </header>
+
+        <div class="game-layout">
+          <section class="code-panel">
+            <h3>Pseudocodigo</h3>
+            <div id="code-viewer" class="code-viewer"></div>
+          </section>
+
+          <aside id="vars-panel" class="vars-panel"></aside>
+        </div>
+
+        <div id="phase-actions" class="phase-actions"></div>
+      </section>
     </main>
-    <script src="src/js/main.js"></script>
+
+    <section id="question-modal" class="question-modal hidden" aria-live="polite">
+      <div class="modal-content">
+        <div class="modal-head">
+          <h3 id="question-title">Pergunta</h3>
+          <button id="btn-minimize-question">Minimizar</button>
+        </div>
+        <p id="question-text"></p>
+        <div id="question-options" class="question-options"></div>
+        <small id="question-timer">Tempo: 0s</small>
+      </div>
+    </section>
+
+    <section id="minimized-question" class="minimized-question hidden">
+      <span>Pergunta minimizada. Responda para continuar.</span>
+      <button id="btn-restore-question">Restaurar</button>
+    </section>
+
+    <section id="feedback-toast" class="toast hidden"></section>
+
+    <script type="module" src="src/js/main.js"></script>
   </body>
 </html>
