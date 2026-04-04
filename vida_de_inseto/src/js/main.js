@@ -5,8 +5,25 @@ import { renderCodeLines, highlightLine, renderVariables, updateHeader } from ".
 const engine = createEngine();
 let tickInterval = null;
 let activeQuestionStart = 0;
-let arrayExpanded = false;
-let modalMinimized = false;
+let varsOpen = window.innerWidth > 900;
+let questionOpen = false;
+let questionPanelLocked = false;
+let optionsOpen = false;
+let latestSnapshot = null;
+let currentQuestion = null;
+let tickDelayMs = GAME_CONFIG.snapshotDelayMs;
+const varTreeState = {
+  scopes: {},
+  arrays: {},
+};
+const THEME_STORAGE_KEY = "vida-inseto-theme";
+const THEMES = [
+  { key: "midnight", label: "Midnight Code" },
+  { key: "sunset", label: "Sunset Debug" },
+];
+const selectionTreeState = {
+  expanded: {},
+};
 
 const screens = {
   menu: document.getElementById("screen-menu"),
@@ -17,20 +34,165 @@ const screens = {
 const ui = {
   btnArcade: document.getElementById("btn-arcade"),
   btnSelection: document.getElementById("btn-selection"),
+  btnThemeToggle: document.getElementById("btn-theme-toggle"),
   btnBackMenu: document.getElementById("btn-back-menu"),
+  workspaceShell: document.querySelector(".workspace-shell"),
   selectionList: document.getElementById("selection-list"),
-  codeViewer: document.getElementById("code-viewer"),
+  codeContent: document.getElementById("code-content"),
+  codeGutter: document.getElementById("code-gutter"),
+  codeScroll: document.getElementById("code-scroll"),
   varsPanel: document.getElementById("vars-panel"),
+  varsContent: document.getElementById("vars-content"),
+  btnToggleVars: document.getElementById("btn-toggle-vars"),
+  btnCloseVars: document.getElementById("btn-close-vars"),
+  btnOpenQuestion: document.getElementById("btn-open-question"),
+  btnCloseQuestion: document.getElementById("btn-close-question"),
+  btnOpenOptions: document.getElementById("btn-open-options"),
+  btnCloseOptions: document.getElementById("btn-close-options"),
+  optionsPanel: document.getElementById("options-panel"),
+  speedSelect: document.getElementById("speed-select"),
+  speedCurrent: document.getElementById("speed-current"),
+  btnBackHome: document.getElementById("btn-back-home"),
+  questionPanel: document.getElementById("question-panel"),
+  questionContent: document.getElementById("question-content"),
+  varsBackdrop: document.getElementById("vars-backdrop"),
   phaseActions: document.getElementById("phase-actions"),
-  questionModal: document.getElementById("question-modal"),
-  questionText: document.getElementById("question-text"),
-  questionOptions: document.getElementById("question-options"),
-  questionTimer: document.getElementById("question-timer"),
-  btnMinimizeQuestion: document.getElementById("btn-minimize-question"),
-  minimizedQuestion: document.getElementById("minimized-question"),
-  btnRestoreQuestion: document.getElementById("btn-restore-question"),
   toast: document.getElementById("feedback-toast"),
 };
+
+function getThemeByKey(key) {
+  const found = THEMES.find((theme) => theme.key === key);
+  return found || THEMES[0];
+}
+
+function readStoredTheme() {
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredTheme(themeKey) {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, themeKey);
+  } catch {
+    // Ignore storage failures to avoid breaking gameplay controls.
+  }
+}
+
+function applyTheme(themeKey) {
+  const theme = getThemeByKey(themeKey);
+  document.body.dataset.theme = theme.key;
+  if (ui.btnThemeToggle) {
+    ui.btnThemeToggle.textContent = `Tema: ${theme.label}`;
+  }
+  writeStoredTheme(theme.key);
+}
+
+function initTheme() {
+  const storedTheme = readStoredTheme();
+  applyTheme(storedTheme || THEMES[0].key);
+}
+
+function toggleTheme() {
+  const currentKey = document.body.dataset.theme || THEMES[0].key;
+  const currentIndex = THEMES.findIndex((theme) => theme.key === currentKey);
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % THEMES.length : 0;
+  applyTheme(THEMES[nextIndex].key);
+}
+
+function syncWorkspaceColumns() {
+  if (!ui.workspaceShell) {
+    return;
+  }
+
+  if (window.innerWidth <= 900) {
+    ui.workspaceShell.style.gridTemplateColumns = "52px minmax(0, 1fr)";
+    ui.varsPanel.style.display = "flex";
+    ui.questionPanel.style.display = "flex";
+    return;
+  }
+
+  const varsCol = varsOpen ? "280px" : "0px";
+  const questionCol = questionOpen ? "340px" : "0px";
+  const shellWidth = ui.workspaceShell.clientWidth;
+  const varsWidth = varsOpen ? 280 : 0;
+  const questionWidth = questionOpen ? 340 : 0;
+  const editorWidth = Math.max(0, shellWidth - 52 - varsWidth - questionWidth);
+  ui.workspaceShell.style.gridTemplateColumns = `52px ${varsCol} ${editorWidth}px ${questionCol}`;
+  ui.varsPanel.style.display = varsOpen ? "flex" : "none";
+  ui.questionPanel.style.display = questionOpen ? "flex" : "none";
+}
+
+function applySidebarState() {
+  screens.game.classList.toggle("sidebar-collapsed", !varsOpen);
+  screens.game.classList.toggle("sidebar-open", varsOpen && window.innerWidth <= 900);
+  ui.btnToggleVars.classList.toggle("active", varsOpen);
+  syncWorkspaceColumns();
+  if (varsOpen && latestSnapshot) {
+    renderVariables(ui.varsContent, latestSnapshot, varTreeState);
+    bindVarTreeInteractions(latestSnapshot);
+  }
+}
+
+function setVarsOpen(next) {
+  varsOpen = next;
+  applySidebarState();
+}
+
+function applyQuestionState() {
+  screens.game.classList.toggle("question-open", questionOpen && window.innerWidth <= 900);
+  screens.game.classList.toggle("question-collapsed", !questionOpen && window.innerWidth > 900);
+  ui.btnOpenQuestion.classList.toggle("active", !!currentQuestion && questionOpen);
+  syncWorkspaceColumns();
+}
+
+function setQuestionOpen(next) {
+  questionOpen = next;
+  applyQuestionState();
+}
+
+function applyOptionsState() {
+  if (!ui.optionsPanel || !ui.btnOpenOptions) {
+    return;
+  }
+  ui.optionsPanel.classList.toggle("open", optionsOpen);
+  ui.btnOpenOptions.classList.toggle("active", optionsOpen);
+}
+
+function setOptionsOpen(next) {
+  optionsOpen = next;
+  applyOptionsState();
+}
+
+function updateSpeedIndicator() {
+  if (!ui.speedCurrent) {
+    return;
+  }
+  ui.speedCurrent.textContent = `Atual: ${tickDelayMs}ms`;
+}
+
+function applyTickSpeed(nextSpeedMs) {
+  if (!Number.isFinite(nextSpeedMs) || nextSpeedMs <= 0) {
+    return;
+  }
+  tickDelayMs = nextSpeedMs;
+  if (ui.speedSelect && Number(ui.speedSelect.value) !== nextSpeedMs) {
+    ui.speedSelect.value = String(nextSpeedMs);
+  }
+  updateSpeedIndicator();
+  if (tickInterval) {
+    startTick();
+  }
+}
+
+function returnToHome() {
+  stopTick();
+  clearQuestionPanel();
+  setOptionsOpen(false);
+  setScreen("menu");
+}
 
 function setScreen(name) {
   for (const key of Object.keys(screens)) {
@@ -50,58 +212,134 @@ function showToast(message, isError = false) {
   }, 1500);
 }
 
-function closeQuestionModal() {
-  ui.questionModal.classList.add("hidden");
-  ui.minimizedQuestion.classList.add("hidden");
-  modalMinimized = false;
+function clearQuestionPanel() {
+  currentQuestion = null;
+  ui.btnOpenQuestion.classList.remove("active");
+  ui.questionContent.classList.add("empty");
+  ui.questionContent.innerHTML = "<p>A pergunta aparecera aqui quando a execucao pausar.</p>";
+  if (window.innerWidth > 900) {
+    setQuestionOpen(false);
+  }
 }
 
-function openQuestionModal(question) {
-  ui.questionText.textContent = question.prompt;
-  ui.questionOptions.innerHTML = "";
-  ui.questionTimer.textContent = "Tempo: 0s";
+function openQuestionPanel(question) {
+  currentQuestion = question;
+  if (!questionPanelLocked) {
+    setQuestionOpen(true);
+  }
+  ui.btnOpenQuestion.classList.add("active");
   activeQuestionStart = Date.now();
 
-  for (const option of question.options) {
-    const button = document.createElement("button");
-    button.textContent = String(option);
-    button.addEventListener("click", () => {
-      const elapsedSeconds = Math.floor((Date.now() - activeQuestionStart) / 1000);
-      const result = engine.answerQuestion(Number(option), elapsedSeconds);
-      if (result.correct) {
-        showToast(`Correto! +${result.delta} pontos`);
-      } else {
-        showToast("Resposta incorreta", true);
-      }
+  function renderQuestionContent() {
+    if (!currentQuestion) {
+      return;
+    }
 
-      updateHeader(engine.state);
-      closeQuestionModal();
-      if (engine.state.status === "game-over") {
-        renderGameOver();
-      }
-    });
-    ui.questionOptions.appendChild(button);
+    const elapsed = Math.floor((Date.now() - activeQuestionStart) / 1000);
+    let html = "";
+    html += `<h4 class=\"question-title\">${currentQuestion.prompt}</h4>`;
+    html += `<div class=\"question-options\">`;
+    for (const option of currentQuestion.options) {
+      html += `<button class=\"question-option\" data-option=\"${option}\" type=\"button\">${option}</button>`;
+    }
+    html += "</div>";
+    html += `<small class=\"question-timer\">Tempo: ${elapsed}s</small>`;
+    ui.questionContent.classList.remove("empty");
+    ui.questionContent.innerHTML = html;
+
+    for (const button of ui.questionContent.querySelectorAll(".question-option")) {
+      button.addEventListener("click", () => {
+        const elapsedSeconds = Math.floor((Date.now() - activeQuestionStart) / 1000);
+        const result = engine.answerQuestion(Number(button.dataset.option), elapsedSeconds);
+        if (result.correct) {
+          showToast(`Correto! +${result.delta} pontos`);
+        } else {
+          showToast("Resposta incorreta", true);
+        }
+
+        updateHeader(engine.state);
+        clearQuestionPanel();
+        if (engine.state.status === "game-over") {
+          renderGameOver();
+          return;
+        }
+
+        if (window.innerWidth <= 900) {
+          setQuestionOpen(false);
+        }
+      });
+    }
   }
 
-  ui.questionModal.classList.remove("hidden");
+  renderQuestionContent();
 
   const timerInterval = setInterval(() => {
-    if (ui.questionModal.classList.contains("hidden") && ui.minimizedQuestion.classList.contains("hidden")) {
+    if (!currentQuestion) {
       clearInterval(timerInterval);
       return;
     }
-    const elapsed = Math.floor((Date.now() - activeQuestionStart) / 1000);
-    ui.questionTimer.textContent = `Tempo: ${elapsed}s`;
+
+    renderQuestionContent();
   }, 1000);
 }
 
 function renderSelectionButtons() {
   ui.selectionList.innerHTML = "";
-  for (const algorithmId of engine.getSelectionAlgorithms()) {
-    const button = document.createElement("button");
-    button.textContent = algorithmId;
-    button.addEventListener("click", () => startGame(MODES.SELECTION, algorithmId));
-    ui.selectionList.appendChild(button);
+
+  const algorithms = engine.getSelectionAlgorithms();
+  const root = document.createElement("ul");
+  root.className = "selection-tree";
+
+  for (const algorithmId of algorithms) {
+    const li = document.createElement("li");
+    li.className = "selection-node";
+
+    const folderButton = document.createElement("button");
+    folderButton.type = "button";
+    folderButton.className = "selection-folder";
+    folderButton.dataset.algorithm = algorithmId;
+    const isExpanded = selectionTreeState.expanded[algorithmId] === true;
+    folderButton.innerHTML = `<span class="selection-chevron">${isExpanded ? "v" : ">"}</span><span class="selection-folder-icon">DIR</span><span class="selection-folder-name">${algorithmId}</span>`;
+    li.appendChild(folderButton);
+
+    if (isExpanded) {
+      const variantList = document.createElement("ul");
+      variantList.className = "selection-variants";
+
+      const optionLi = document.createElement("li");
+      const optionButton = document.createElement("button");
+      optionButton.type = "button";
+      optionButton.className = "selection-option";
+      optionButton.dataset.startAlgorithm = algorithmId;
+      optionButton.innerHTML = `<span class="selection-file-icon">JS</span><span>Pseudocodigo iterativo</span>`;
+      optionLi.appendChild(optionButton);
+      variantList.appendChild(optionLi);
+
+      const hintLi = document.createElement("li");
+      hintLi.className = "selection-hint";
+      hintLi.textContent = "Variacoes futuras podem ser adicionadas aqui.";
+      variantList.appendChild(hintLi);
+
+      li.appendChild(variantList);
+    }
+
+    root.appendChild(li);
+  }
+
+  ui.selectionList.appendChild(root);
+
+  for (const folderButton of ui.selectionList.querySelectorAll(".selection-folder")) {
+    folderButton.addEventListener("click", () => {
+      const { algorithm } = folderButton.dataset;
+      selectionTreeState.expanded[algorithm] = !selectionTreeState.expanded[algorithm];
+      renderSelectionButtons();
+    });
+  }
+
+  for (const optionButton of ui.selectionList.querySelectorAll(".selection-option")) {
+    optionButton.addEventListener("click", () => {
+      startGame(MODES.SELECTION, optionButton.dataset.startAlgorithm);
+    });
   }
 }
 
@@ -155,11 +393,19 @@ function renderPhaseEnd(finalQuestion) {
 }
 
 function renderNewPhase() {
-  arrayExpanded = false;
+  varTreeState.scopes = {};
+  varTreeState.arrays = {};
+  clearQuestionPanel();
   ui.phaseActions.innerHTML = "";
-  renderCodeLines(ui.codeViewer, engine.state.phase.pseudocode);
-  renderVariables(ui.varsPanel, engine.state.phase.snapshots[0], arrayExpanded);
+  renderCodeLines(ui.codeContent, ui.codeGutter, engine.state.phase.pseudocode);
+  latestSnapshot = engine.state.phase.snapshots[0];
+  if (varsOpen) {
+    renderVariables(ui.varsContent, latestSnapshot, varTreeState);
+    bindVarTreeInteractions(latestSnapshot);
+  }
   updateHeader(engine.state);
+  applySidebarState();
+  applyQuestionState();
 }
 
 function handleTick() {
@@ -169,19 +415,23 @@ function handleTick() {
   }
 
   if (event.type === "step") {
-    highlightLine(ui.codeViewer, event.snapshot.line);
-    if (!modalMinimized) {
-      renderVariables(ui.varsPanel, event.snapshot, arrayExpanded);
-      bindArrayToggle(event.snapshot);
+    latestSnapshot = event.snapshot;
+    highlightLine(ui.codeContent, ui.codeGutter, event.snapshot.line);
+    if (varsOpen) {
+      renderVariables(ui.varsContent, event.snapshot, varTreeState);
+      bindVarTreeInteractions(event.snapshot);
     }
     return;
   }
 
   if (event.type === "question") {
-    highlightLine(ui.codeViewer, event.snapshot.line);
-    renderVariables(ui.varsPanel, event.snapshot, arrayExpanded);
-    bindArrayToggle(event.snapshot);
-    openQuestionModal(event.question);
+    latestSnapshot = event.snapshot;
+    highlightLine(ui.codeContent, ui.codeGutter, event.snapshot.line);
+    if (varsOpen) {
+      renderVariables(ui.varsContent, event.snapshot, varTreeState);
+      bindVarTreeInteractions(event.snapshot);
+    }
+    openQuestionPanel(event.question);
     return;
   }
 
@@ -190,21 +440,29 @@ function handleTick() {
   }
 }
 
-function bindArrayToggle(snapshot) {
-  const button = document.getElementById("toggle-array");
-  if (!button) {
-    return;
+function bindVarTreeInteractions(snapshot) {
+  for (const button of ui.varsContent.querySelectorAll("[data-toggle-scope]")) {
+    button.addEventListener("click", () => {
+      const key = button.dataset.toggleScope;
+      varTreeState.scopes[key] = !varTreeState.scopes[key];
+      renderVariables(ui.varsContent, snapshot, varTreeState);
+      bindVarTreeInteractions(snapshot);
+    });
   }
-  button.addEventListener("click", () => {
-    arrayExpanded = !arrayExpanded;
-    renderVariables(ui.varsPanel, snapshot, arrayExpanded);
-    bindArrayToggle(snapshot);
-  });
+
+  for (const button of ui.varsContent.querySelectorAll("[data-toggle-array]")) {
+    button.addEventListener("click", () => {
+      const key = button.dataset.toggleArray;
+      varTreeState.arrays[key] = !varTreeState.arrays[key];
+      renderVariables(ui.varsContent, snapshot, varTreeState);
+      bindVarTreeInteractions(snapshot);
+    });
+  }
 }
 
 function startTick() {
   stopTick();
-  tickInterval = setInterval(handleTick, GAME_CONFIG.snapshotDelayMs);
+  tickInterval = setInterval(handleTick, tickDelayMs);
 }
 
 function stopTick() {
@@ -216,6 +474,12 @@ function stopTick() {
 
 function startGame(mode, selectionAlgorithmId) {
   engine.start(mode, selectionAlgorithmId);
+  latestSnapshot = null;
+  varsOpen = window.innerWidth > 900;
+  questionOpen = false;
+  questionPanelLocked = false;
+  optionsOpen = false;
+  applyOptionsState();
   setScreen("game");
   renderNewPhase();
   startTick();
@@ -231,24 +495,87 @@ function bindEvents() {
     setScreen("selection");
   });
 
+  if (ui.btnThemeToggle) {
+    ui.btnThemeToggle.addEventListener("click", () => {
+      toggleTheme();
+    });
+  }
+
+  if (ui.btnOpenOptions) {
+    ui.btnOpenOptions.addEventListener("click", () => {
+      setOptionsOpen(!optionsOpen);
+    });
+  }
+
+  if (ui.btnCloseOptions) {
+    ui.btnCloseOptions.addEventListener("click", () => {
+      setOptionsOpen(false);
+    });
+  }
+
+  if (ui.speedSelect) {
+    ui.speedSelect.addEventListener("change", () => {
+      applyTickSpeed(Number(ui.speedSelect.value));
+    });
+  }
+
+  if (ui.btnBackHome) {
+    ui.btnBackHome.addEventListener("click", () => {
+      returnToHome();
+    });
+  }
+
   ui.btnBackMenu.addEventListener("click", () => {
     setScreen("menu");
   });
 
-  ui.btnMinimizeQuestion.addEventListener("click", () => {
-    modalMinimized = true;
-    ui.questionModal.classList.add("hidden");
-    ui.minimizedQuestion.classList.remove("hidden");
+  ui.btnToggleVars.addEventListener("click", () => {
+    setVarsOpen(!varsOpen);
   });
 
-  ui.btnRestoreQuestion.addEventListener("click", () => {
-    modalMinimized = false;
-    ui.questionModal.classList.remove("hidden");
-    ui.minimizedQuestion.classList.add("hidden");
+  ui.btnCloseVars.addEventListener("click", () => {
+    setVarsOpen(false);
+  });
+
+  ui.varsBackdrop.addEventListener("click", () => {
+    setVarsOpen(false);
+    setQuestionOpen(false);
+  });
+
+  ui.btnOpenQuestion.addEventListener("click", () => {
+    if (currentQuestion) {
+      const next = !questionOpen;
+      setQuestionOpen(next);
+      questionPanelLocked = !next;
+    }
+  });
+
+  ui.btnCloseQuestion.addEventListener("click", () => {
+    questionPanelLocked = true;
+    setQuestionOpen(false);
+  });
+
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 900 && !varsOpen) {
+      setVarsOpen(true);
+    }
+    if (window.innerWidth > 900 && !questionOpen && currentQuestion && !questionPanelLocked) {
+      setQuestionOpen(true);
+    }
+
+    applySidebarState();
+    applyQuestionState();
+  });
+
+  ui.codeScroll.addEventListener("scroll", () => {
+    const y = ui.codeScroll.scrollTop;
+    ui.codeGutter.style.transform = `translateY(${-y}px)`;
   });
 }
 
 function init() {
+  initTheme();
+  applyTickSpeed(GAME_CONFIG.snapshotDelayMs);
   bindEvents();
   setScreen("menu");
 }
