@@ -1,4 +1,4 @@
-# Vida de Inseto
+# GDD
 
 Jogo web educativo focado em praticar logica de algoritmos por meio da leitura de execucao passo a passo.
 

@@ -1,7 +1,7 @@
-# Vida de Inseto - Visao Geral
+# GDD - Visao Geral
 
 ## O que e o projeto
-Vida de Inseto e um jogo educativo para navegador em que o jogador acompanha a execucao de algoritmos classicos e responde perguntas sobre o estado das variaveis durante a execucao.
+GDD e um jogo educativo para navegador em que o jogador acompanha a execucao de algoritmos classicos e responde perguntas sobre o estado das variaveis durante a execucao.
 
 ## Objetivo pedagogico
 Promover compreensao real de fluxo de algoritmo, com foco em:
