@@ -51,15 +51,19 @@ function isArrayLike(value) {
 }
 
 export function renderVariables(container, snapshot, treeState = { scopes: {}, arrays: {} }) {
-  const rawScopes = snapshot?.scopeVars && typeof snapshot.scopeVars === "object"
+  const baseScopes = snapshot?.scopeVars && typeof snapshot.scopeVars === "object"
     ? snapshot.scopeVars
     : { principal: snapshot?.vars || {} };
 
-  if (!rawScopes.principal) {
-    rawScopes.principal = {};
-  }
+  const rawScopes = { ...baseScopes };
+  const principalScope = rawScopes.principal && typeof rawScopes.principal === "object"
+    ? rawScopes.principal
+    : {};
 
-  rawScopes.principal.array = snapshot?.array || [];
+  rawScopes.principal = {
+    ...principalScope,
+    array: snapshot?.array || [],
+  };
 
   let html = "<div class=\"tree-group\"><div class=\"tree-title\">VARIABLES</div>";
   html += "<ul class=\"tree-list\">";

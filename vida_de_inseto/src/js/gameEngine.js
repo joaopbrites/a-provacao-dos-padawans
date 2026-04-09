@@ -3,6 +3,7 @@ import { createInitialState } from "./core/stateStore.js";
 import { calculateAnswerScore, addScore, registerError, shouldEndByErrors } from "./core/scoreEngine.js";
 import { createPhase, getAlgorithmIds } from "./phaseEngine.js";
 import { mulberry32, pickRandom, shuffleWithRng } from "./utils/random.js";
+import { createSessionState, selectQuestionForSnapshot } from "./quizEngine.js";
 
 function nowSeed() {
   return Math.floor(Date.now() % 2147483647);
@@ -18,6 +19,8 @@ export function createEngine() {
     currentSnapshotIndex: 0,
     paused: false,
     gameOverReason: "",
+    sessionState: createSessionState(),
+    questionsAskedInPhase: 0,
   };
 
   function start(mode, selectedAlgorithmId) {
@@ -36,15 +39,9 @@ export function createEngine() {
     state.currentSnapshotIndex = 0;
     state.paused = false;
     state.pendingQuestion = null;
-
-    const queue = [];
-    for (const question of state.phase.questions) {
-      const idx = state.phase.snapshots.findIndex((snapshot) => snapshot.step === question.snapshotStep);
-      if (idx >= 0) {
-        queue.push({ ...question, snapshotIndex: idx });
-      }
-    }
-    state.questionQueue = queue.sort((a, b) => a.snapshotIndex - b.snapshotIndex);
+    state.questionQueue = [];
+    state.sessionState.reset();
+    state.questionsAskedInPhase = 0;
 
     const allAlgorithmIds = getAlgorithmIds();
     const rng = mulberry32(seed + 9);
@@ -70,11 +67,23 @@ export function createEngine() {
     }
 
     const snapshot = state.phase.snapshots[state.currentSnapshotIndex];
-    const currentQuestion = state.questionQueue[0];
 
-    if (currentQuestion && currentQuestion.snapshotIndex === state.currentSnapshotIndex) {
+    let currentQuestion = null;
+    if (state.questionsAskedInPhase < GAME_CONFIG.questionsPerPhase) {
+      currentQuestion = selectQuestionForSnapshot({
+        questionDefinitions: state.phase.questionDefinitions,
+        allSnapshots: state.phase.snapshots,
+        currentIndex: state.currentSnapshotIndex,
+        sessionState: state.sessionState,
+        seed: state.phase.seed,
+        locale: state.phase.algorithmDescriptor.locale,
+        algorithmDescriptor: state.phase.algorithmDescriptor,
+      });
+    }
+
+    if (currentQuestion) {
       state.pendingQuestion = currentQuestion;
-      state.questionQueue.shift();
+      state.questionsAskedInPhase += 1;
       state.paused = true;
       return { type: "question", snapshot, question: currentQuestion };
     }
@@ -88,7 +97,7 @@ export function createEngine() {
       return { correct: false, delta: 0 };
     }
 
-    const isCorrect = Number(value) === Number(state.pendingQuestion.correctAnswer);
+    const isCorrect = String(value) === String(state.pendingQuestion.correctAnswer);
     const delta = calculateAnswerScore(isCorrect, elapsedSeconds);
     if (isCorrect) {
       state.score = addScore(state.score, delta);

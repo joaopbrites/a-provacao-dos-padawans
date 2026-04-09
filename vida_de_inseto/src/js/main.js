@@ -1,6 +1,13 @@
 import { MODES, GAME_CONFIG } from "./config.js";
 import { createEngine } from "./gameEngine.js";
-import { renderCodeLines, highlightLine, renderVariables, updateHeader } from "./ui.js";
+import { renderCodeLines, highlightLine, renderVariables, updateHeader } from "./ui.js?v=20260408c";
+import {
+  onIncomingQuestion,
+  onClearQuestion,
+  onToggleByUser,
+  onManualClose,
+  onResize,
+} from "./core/questionPanelController.js?v=20260408c";
 
 const engine = createEngine();
 let tickInterval = null;
@@ -214,6 +221,10 @@ function showToast(message, isError = false) {
 
 function clearQuestionPanel() {
   currentQuestion = null;
+  ({ questionOpen, questionPanelLocked } = onClearQuestion(
+    { questionOpen, questionPanelLocked },
+    window.innerWidth > 900
+  ));
   ui.btnOpenQuestion.classList.remove("active");
   ui.questionContent.classList.add("empty");
   ui.questionContent.innerHTML = "<p>A pergunta aparecera aqui quando a execucao pausar.</p>";
@@ -224,9 +235,8 @@ function clearQuestionPanel() {
 
 function openQuestionPanel(question) {
   currentQuestion = question;
-  if (!questionPanelLocked) {
-    setQuestionOpen(true);
-  }
+  ({ questionOpen, questionPanelLocked } = onIncomingQuestion({ questionOpen, questionPanelLocked }));
+  setQuestionOpen(true);
   ui.btnOpenQuestion.classList.add("active");
   activeQuestionStart = Date.now();
 
@@ -250,7 +260,7 @@ function openQuestionPanel(question) {
     for (const button of ui.questionContent.querySelectorAll(".question-option")) {
       button.addEventListener("click", () => {
         const elapsedSeconds = Math.floor((Date.now() - activeQuestionStart) / 1000);
-        const result = engine.answerQuestion(Number(button.dataset.option), elapsedSeconds);
+        const result = engine.answerQuestion(button.dataset.option, elapsedSeconds);
         if (result.correct) {
           showToast(`Correto! +${result.delta} pontos`);
         } else {
@@ -409,7 +419,15 @@ function renderNewPhase() {
 }
 
 function handleTick() {
-  const event = engine.tick();
+  let event;
+  try {
+    event = engine.tick();
+  } catch (error) {
+    stopTick();
+    showToast(`Erro na execucao: ${error?.message || error}`, true);
+    return;
+  }
+
   if (event.type === "idle") {
     return;
   }
@@ -462,6 +480,7 @@ function bindVarTreeInteractions(snapshot) {
 
 function startTick() {
   stopTick();
+  handleTick();
   tickInterval = setInterval(handleTick, tickDelayMs);
 }
 
@@ -543,23 +562,28 @@ function bindEvents() {
   });
 
   ui.btnOpenQuestion.addEventListener("click", () => {
-    if (currentQuestion) {
-      const next = !questionOpen;
-      setQuestionOpen(next);
-      questionPanelLocked = !next;
-    }
+    ({ questionOpen, questionPanelLocked } = onToggleByUser(
+      { questionOpen, questionPanelLocked },
+      Boolean(currentQuestion)
+    ));
+    setQuestionOpen(questionOpen);
   });
 
   ui.btnCloseQuestion.addEventListener("click", () => {
-    questionPanelLocked = true;
-    setQuestionOpen(false);
+    ({ questionOpen, questionPanelLocked } = onManualClose({ questionOpen, questionPanelLocked }));
+    setQuestionOpen(questionOpen);
   });
 
   window.addEventListener("resize", () => {
     if (window.innerWidth > 900 && !varsOpen) {
       setVarsOpen(true);
     }
-    if (window.innerWidth > 900 && !questionOpen && currentQuestion && !questionPanelLocked) {
+    ({ questionOpen, questionPanelLocked } = onResize(
+      { questionOpen, questionPanelLocked },
+      window.innerWidth,
+      Boolean(currentQuestion)
+    ));
+    if (window.innerWidth > 900 && questionOpen) {
       setQuestionOpen(true);
     }
 

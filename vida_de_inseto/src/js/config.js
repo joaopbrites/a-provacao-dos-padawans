@@ -1,5 +1,5 @@
 export const GAME_CONFIG = {
-  arraySize: 8,
+  arraySize: 5,
   minValue: 0,
   maxValue: 99,
   snapshotDelayMs: 700,
