@@ -1,0 +1,9 @@
+{
+  "name": "vida-de-inseto",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test qa/unit/**/*.test.js qa/ui/**/*.test.js"
+  }
+}

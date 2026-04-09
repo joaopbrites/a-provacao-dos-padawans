@@ -3,141 +3,111 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vida de Inseto</title>
-    <link rel="stylesheet" href="src/css/style.css?v=20260408a" />
+    <title>Vida de Inseto - Banco de Questoes</title>
+    <link rel="stylesheet" href="src/css/style.css?v=20260409a" />
   </head>
   <body>
     <main class="app">
       <section id="screen-menu" class="screen screen-active" aria-label="Menu principal">
-        <div class="welcome-shell">
-          <header class="welcome-header">
-            <h1>Vida de Inseto</h1>
-            <p class="subtitle">Debugging evolved</p>
-          </header>
-
-          <div class="welcome-grid">
-            <section class="welcome-start" aria-label="Iniciar jogo">
-              <h2>Start</h2>
-              <div class="start-actions" role="group" aria-label="Modos de jogo">
-                <button id="btn-arcade" class="start-link" type="button">Iniciar Arcade</button>
-                <button id="btn-selection" class="start-link" type="button">Iniciar Selection</button>
-                <button id="btn-theme-toggle" class="start-link theme-link" type="button">Tema: Midnight Code</button>
-              </div>
-            </section>
-
-            <section class="welcome-rules" aria-label="Regras do questionario">
-              <h2>Regras do Questionario</h2>
-              <ul class="rules-list">
-                <li>Cada pergunta surge durante a execucao do algoritmo.</li>
-                <li>Voce ganha ate 100 pontos por acerto rapido.</li>
-                <li>Depois de 15 segundos, a cada 3 segundos perde 10 pontos.</li>
-                <li>Resposta errada conta como erro da fase atual.</li>
-                <li>No modo Arcade, 3 erros na mesma fase encerram a partida.</li>
-              </ul>
-            </section>
-          </div>
-        </div>
-      </section>
-
-      <section id="screen-selection" class="screen" aria-label="Modo selection">
-        <div class="selection-shell">
-          <header class="selection-header">
-            <h2>Selection Explorer</h2>
-            <p>Escolha um algoritmo e abra a variacao disponivel.</p>
-          </header>
-
-          <div class="selection-explorer">
-            <div class="selection-explorer-head">
-              <span>ALGORITHMS</span>
+        <div class="menu-shell">
+          <h1>Vida de Inseto</h1>
+          <p>Treino classico com banco de perguntas de IALG, ED, POO, Grafos e CPA.</p>
+          <div class="menu-actions">
+            <div class="menu-group" id="group-mode">
+              <label for="select-mode">Modo</label>
+              <select id="select-mode">
+                <option value="curriculum" selected>Percurso de Formatura</option>
+                <option value="free">Treino livre</option>
+              </select>
             </div>
-            <div id="selection-list" class="selection-list-wrap"></div>
+            <div class="menu-group" id="group-category">
+              <label for="select-category">Categoria</label>
+              <select id="select-category">
+                <option value="all">Todas</option>
+                <option value="IALG">IALG</option>
+                <option value="ED">Estruturas de Dados</option>
+                <option value="POO">POO</option>
+                <option value="Grafos">Grafos</option>
+                <option value="CPA">CPA</option>
+              </select>
+            </div>
+            <div class="menu-group" id="group-goal">
+              <label for="select-goal">Meta de questoes</label>
+              <select id="select-goal">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="15">15</option>
+              </select>
+            </div>
+            <div class="menu-group" id="group-theme">
+              <label for="select-theme">Tema</label>
+              <select id="select-theme">
+                <option value="ocean">Ocean</option>
+                <option value="light">Claro</option>
+                <option value="forest">Floresta</option>
+              </select>
+            </div>
+            <button id="btn-start" type="button">Iniciar Treino</button>
           </div>
-
-          <button id="btn-back-menu" class="selection-back" type="button">Voltar</button>
         </div>
       </section>
 
       <section id="screen-game" class="screen" aria-label="Tela de jogo">
         <div class="workspace-shell">
-          <nav class="activity-bar" aria-label="Barra de atividade">
-            <button id="btn-toggle-vars" class="activity active" title="Variaveis" type="button">V</button>
-            <button id="btn-open-question" class="activity" title="Pergunta" type="button">Q</button>
-            <button id="btn-open-options" class="activity" title="Opcoes" type="button">O</button>
-          </nav>
-
-          <aside id="vars-panel" class="side-panel" aria-label="Painel de variaveis">
+          <aside id="question-panel" class="side-panel" aria-label="Painel de perguntas">
             <div class="side-header">
-              <span>VARIABLES</span>
-              <button id="btn-close-vars" class="btn-link" type="button">Ocultar</button>
+              <span>Pergunta</span>
             </div>
-            <div id="vars-content" class="vars-content"></div>
+            <div class="question-content">
+              <h3 id="question-topic"></h3>
+              <p id="question-text"></p>
+              <div id="question-options"></div>
+              <button id="btn-next-question" type="button">Proxima pergunta</button>
+            </div>
           </aside>
 
           <section class="editor-zone" aria-label="Editor de pseudocodigo">
             <div class="editor-toolbar">
-              <span class="editor-tab" id="hud-phase-tab">Fase 1</span>
-              <span class="editor-meta">Sessao ativa</span>
+              <span class="editor-tab">Codigo C++</span>
+              <span class="editor-meta" id="question-difficulty"></span>
             </div>
             <div class="editor-wrap">
-              <div id="code-gutter" class="gutter" aria-hidden="true"></div>
-              <div id="code-scroll" class="code-scroll">
-                <div id="code-content" class="code-content"></div>
+              <div class="gutter" aria-hidden="true"></div>
+              <div class="code-scroll">
+                <pre id="code-view" class="code-content"></pre>
               </div>
             </div>
-            <div id="phase-actions" class="phase-actions"></div>
+            <div class="phase-actions">
+              <button id="btn-back-menu" type="button">Voltar ao menu</button>
+            </div>
           </section>
-
-          <aside id="question-panel" class="extension-panel" aria-label="Painel de pergunta">
-            <div class="side-header">
-              <span>PERGUNTA</span>
-              <button id="btn-close-question" class="btn-link" type="button">Ocultar</button>
-            </div>
-            <div id="question-content" class="question-content empty">
-              <p>A pergunta aparecera aqui quando a execucao pausar.</p>
-            </div>
-          </aside>
         </div>
-
-        <aside id="options-panel" class="options-panel" aria-label="Menu de opcoes">
-          <div class="options-head">
-            <span>OPCOES</span>
-            <button id="btn-close-options" class="btn-link" type="button">Fechar</button>
-          </div>
-          <div class="options-body" role="menu" aria-label="Configuracoes do jogo">
-            <div class="options-item" role="none">
-              <label for="speed-select" class="options-item-title">Velocidade da execucao</label>
-              <select id="speed-select" role="menuitem">
-                <option value="400">Rapida (400ms)</option>
-                <option value="700" selected>Normal (700ms)</option>
-                <option value="1100">Lenta (1100ms)</option>
-              </select>
-              <small id="speed-current">Atual: 700ms</small>
-            </div>
-
-            <div class="options-item" role="none">
-              <span class="options-item-title">Sessao</span>
-              <button id="btn-back-home" class="options-danger" type="button" role="menuitem">Voltar para tela inicial</button>
-            </div>
-          </div>
-        </aside>
-
-        <div id="vars-backdrop" class="vars-backdrop hidden"></div>
 
         <footer class="statusbar" aria-label="Barra de status">
           <div class="status-left">
-            <span>Modo: <strong id="hud-mode">-</strong></span>
-            <span>Pontos: <strong id="hud-score">0</strong></span>
+            <span>Pontuacao: <strong id="score">0</strong></span>
+            <span>Respondidas: <strong id="answered">0</strong></span>
           </div>
           <div class="status-right">
-            <span>Erros: <strong id="hud-errors">0</strong></span>
-            <span id="hud-phase-text">Fase: <strong id="hud-phase">1</strong></span>
+            <span>Acertos: <strong id="correct">0</strong></span>
+            <span>Topico: <strong id="current-topic">-</strong></span>
+            <span>Objetivo: <strong id="goal-progress">0/15</strong></span>
           </div>
         </footer>
       </section>
+
+      <section id="screen-graduation" class="screen" aria-label="Tela de formatura">
+        <div class="graduation-shell">
+          <div id="confetti-container" class="confetti-container" aria-hidden="true"></div>
+          <h2 id="graduation-title">Parabens, voce se formou!</h2>
+          <p id="graduation-summary"></p>
+          <button id="btn-graduation-menu" type="button">Voltar ao menu</button>
+        </div>
+      </section>
     </main>
 
-    <section id="feedback-toast" class="toast hidden"></section>
+    <section id="feedback-toast" class="toast hidden" aria-live="polite"></section>
 
-    <script type="module" src="src/js/main.js?v=20260408c"></script>
+    <script type="module" src="src/js/app.js?v=20260409a"></script>
   </body>
 </html>
