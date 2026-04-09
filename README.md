@@ -1,6 +1,6 @@
-# GDD
+# A Provação dos Padawans
 
-Jogo web educativo focado em praticar logica de algoritmos por meio da leitura de execucao passo a passo.
+Jogo web educativo focado em praticar logica de algoritmos por meio de um quiz progressivo por disciplinas.
 
 ## Objetivo
 
@@ -16,7 +16,7 @@ Sem frameworks e sem bibliotecas externas.
 
 ## Status atual
 
-Projeto com primeira versao funcional de gameplay (Arcade e Selection) ja implementada.
+Projeto com versao funcional de gameplay em dois modos: Percurso de Formatura e Treino livre.
 
 ## Estrutura principal
 
@@ -25,11 +25,11 @@ Projeto com primeira versao funcional de gameplay (Arcade e Selection) ja implem
 
 ## MVP (resumo)
 
-- Modos: Arcade e Selection
-- Execucao real dos algoritmos em JavaScript
-- Exibicao em pseudocodigo
-- Quiz por snapshots
-- Pontuacao por tempo de resposta
+- Modos: Percurso de Formatura e Treino livre
+- Banco de perguntas por disciplina (IALG, ED, POO, Grafos e CPA)
+- Exibicao de trechos em C++ para contexto da pergunta
+- Pontuacao por acerto
+- Objetivo configuravel de questoes por partida
 
 ## Como executar localmente
 

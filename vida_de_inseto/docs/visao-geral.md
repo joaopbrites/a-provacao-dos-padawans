@@ -1,7 +1,7 @@
-# GDD - Visao Geral
+# A Provação dos Padawans - Visao Geral
 
 ## O que e o projeto
-GDD e um jogo educativo para navegador em que o jogador acompanha a execucao de algoritmos classicos e responde perguntas sobre o estado das variaveis durante a execucao.
+A Provação dos Padawans e um jogo educativo para navegador em que o jogador acompanha a execucao de algoritmos classicos e responde perguntas sobre o estado das variaveis durante a execucao.
 
 ## Objetivo pedagogico
 Promover compreensao real de fluxo de algoritmo, com foco em:
